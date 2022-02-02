@@ -1,0 +1,26 @@
+/* 1 */
+
+SELECT name, category_id 
+FROM dvd_rentals.category
+ORDER BY category_id DESC
+LIMIT 5;
+
+/* 2 */
+
+SELECT length, replacement_cost, rating, title
+FROM dvd_rentals.film
+ORDER BY length DESC, rating DESC, replacement_cost
+LIMIT 10;
+
+/* 3 */ 
+ 
+SELECT manager, total_sales
+FROM dvd_rentals.sales_by_store
+ORDER BY total_sales DESC;
+
+/* 4 */ 
+
+SELECT postal_code, city_id
+FROM dvd_rentals.address
+ORDER BY city_id DESC
+LIMIT 5;
