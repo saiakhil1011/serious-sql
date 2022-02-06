@@ -1,0 +1,192 @@
+/*1. Which id value has the most number of duplicate records 
+ in the health.user_logs table? */
+
+DROP TABLE IF EXISTS deduplicated_counts;
+
+CREATE TEMP TABLE deduplicated_counts AS (
+   SELECT *, COUNT(*) AS frequency
+   FROM health.user_logs
+   GROUP BY 
+      id, 
+      log_date,
+      measure,
+      measure_value, 
+      systolic, 
+      diastolic
+);
+
+SELECT 
+  id, 
+  SUM(frequency) AS duplicates
+FROM deduplicated_counts
+WHERE frequency >1
+GROUP BY id
+ORDER BY duplicates DESC
+LIMIT 10;
+
+
+/* 2. Which log_date value had the most duplicate records after 
+removing the max duplicate id value from question 1? */
+
+WITH deduplicated_records AS(
+    SELECT 
+        id,
+        log_date,
+        measure,
+        measure_value,
+        systolic,
+        diastolic,
+        COUNT(*) AS frequency
+    FROM health.user_logs
+    GROUP BY 
+        id,
+        log_date,
+        measure,
+        measure_value,
+        systolic,
+        diastolic
+)
+SELECT 
+    log_date, 
+    SUM(frequency) AS duplicate_records 
+FROM deduplicated_records 
+WHERE id != '054250c692e07a9fa9e62e345231df4b54ff435d'
+AND frequency > 1
+GROUP BY log_date
+ORDER BY duplicate_records DESC
+LIMIT 10;
+
+-- Use single quotes in sql. double quotes are not usually used.
+-- using double quotes might result in errors.
+
+/* 3. Which measure_value had the most occurences in the 
+health.user_logs value when measure = 'weight'? */
+
+SELECT 
+    measure_value,
+    COUNT(*) AS weight_frequency
+FROM health.user_logs
+WHERE measure = 'weight'
+GROUP BY measure_value
+ORDER BY weight_frequency DESC 
+LIMIT 10;
+
+/* 4. How many single duplicated rows exist when 
+measure = 'blood_pressure' in the health.user_logs? 
+How about the total number of duplicate records in the same table? */
+
+DROP TABLE IF EXISTS bp_deduplicated;
+CREATE TEMP TABLE bp_deduplicated AS(
+    SELECT 
+        *, 
+        COUNT(*) AS frequency
+    FROM health.user_logs
+    WHERE measure = 'blood_pressure'
+    GROUP BY 
+        id,
+        log_date,
+        measure,
+        measure_value,
+        systolic,
+        diastolic
+);
+--for only single duplicated rows, frequency = 2 is correct. 
+SELECT COUNT(*)
+FROM bp_deduplicated
+WHERE frequency = 2;
+
+--calculate the total number of duplicated records, so sum. 
+SELECT SUM(frequency)
+FROM bp_deduplicated
+WHERE frequency > 1;
+
+/* 5. What percentage of records measure_value = 0 when 
+measure = 'blood_pressure' in the health.user_logs table? 
+How many records are there also for this same condition? */
+SELECT 
+    measure_value, 
+    COUNT(*) AS frequency,
+    SUM(COUNT(*)) OVER () AS total_counts,
+    ROUND(100* COUNT(*)::NUMERIC / SUM(COUNT(*)) OVER (), 2) AS percentage
+FROM health.user_logs
+WHERE measure = 'blood_pressure'
+GROUP BY measure_value
+ORDER BY measure_value
+LIMIT 1;
+
+/* 6. What percentage of records are duplicates in the 
+health.user_logs table? */
+WITH duplicate_counts AS (
+  SELECT 
+      *,
+      COUNT(*) AS frequency,
+      SUM(COUNT(*)) OVER () AS total_records
+  FROM health.user_logs
+  GROUP BY 
+      id, 
+      log_date,
+      measure,
+      measure_value,
+      systolic,
+      diastolic
+)
+SELECT 
+  SUM(frequency-1) OVER () AS duplicate_records,
+  total_records,
+  ROUND(100* SUM(frequency-1) OVER ():: NUMERIC / total_records, 2)  AS percentage
+FROM duplicate_counts
+WHERE frequency >1
+LIMIT 1;
+
+--This could also be done in other interesting and probably more 
+--efficient way.
+
+
+WITH deduped_logs AS (
+  SELECT DISTINCT *
+  FROM health.user_logs
+)
+SELECT
+  ROUND(
+    100 * (
+      (SELECT COUNT(*) FROM health.user_logs) -
+      (SELECT COUNT(*) FROM deduped_logs)
+    )::NUMERIC /
+    (SELECT COUNT(*) FROM health.user_logs),
+    2
+  ) AS duplicate_percentage;
+
+
+
+  --or 
+
+WITH groupby_counts AS (
+  SELECT
+    id,
+    log_date,
+    measure,
+    measure_value,
+    systolic,
+    diastolic,
+    COUNT(*) AS frequency
+  FROM health.user_logs
+  GROUP BY
+    id,
+    log_date,
+    measure,
+    measure_value,
+    systolic,
+    diastolic
+)
+SELECT
+  -- Need to subtract 1 from the frequency to count actual duplicates!
+  -- Also don't forget about the integer floor division!
+  ROUND(
+    100 * SUM(CASE
+        WHEN frequency > 1 THEN frequency - 1
+        ELSE 0 END
+    )::NUMERIC / SUM(frequency),
+    2
+  ) AS duplicate_percentage
+FROM groupby_counts;
+
