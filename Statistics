@@ -1,0 +1,30 @@
+/* 1. What is the average, median and mode values of blood glucose values to 2 decimal places?*/
+
+
+SELECT 
+  ROUND(AVG(measure_value),2) AS mean,
+  ROUND(CAST(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY measure_value) AS NUMERIC), 2) AS median,
+  ROUND(MODE() WITHIN GROUP (ORDER BY measure_value),2) AS mode_value
+FROM health.user_logs
+WHERE measure = 'blood_glucose';
+
+
+/* 2. What is the most frequently occuring measure_value value for all blood glucose measurements?*/
+--SAME AS MODE
+
+/*3.Calculate the 2 Pearson Coefficient of Skewness for blood glucose measures given the following formulas*/
+
+WITH central_tendency AS (
+    SELECT 
+        AVG(measure_value) AS mean,
+        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY measure_value) AS median,
+        MODE() WITHIN GROUP (ORDER BY measure_value) AS mode_value,
+        STDDEV(measure_value) AS std_deviation
+    FROM health.user_logs
+    WHERE measure = 'blood_glucose'
+)
+SELECT
+    ROUND((mean-mode_value)/std_deviation,2) AS mode_skewness,
+    ROUND(CAST(3*(mean-median)/std_deviation AS NUMERIC), 2) AS median_skewness
+-- Median is float so use 'CAST' to change it to numeric before rounding it off.
+FROM central_tendency;
